@@ -108,6 +108,7 @@ export const getProperty = /* GraphQL */ `
       propertyType
       listingType
       images
+      imageUrls
       submittedBy
       submittedAt
       updatedAt
@@ -172,12 +173,18 @@ export const listPendingProperties = /* GraphQL */ `
         propertyType
         listingType
         images
+        imageUrls
         status
         submittedAt
         submittedBy
         contactName
         contactEmail
         contactPhone
+        amenities
+        yearBuilt
+        lotSize
+        parkingSpaces
+        isPublic
       }
       nextToken
     }

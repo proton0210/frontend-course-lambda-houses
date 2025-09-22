@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, CreditCard, Loader2, Check, PartyPopper } from 'lucide-react';
+import { X, CreditCard, Loader2, PartyPopper, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,15 +9,17 @@ import { api } from '@/lib/api/graphql-client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
+import type { User } from '@/lib/api/graphql-client';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   cognitoUserId: string;
   onSuccess: () => void;
+  userDetails?: User | null;
 }
 
-export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: PaymentModalProps) {
+export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess, userDetails }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [formData, setFormData] = useState({
@@ -26,6 +28,11 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
     expiryMonth: '',
     expiryYear: '',
     cvv: ''
+  });
+  const [personalInfo, setPersonalInfo] = useState({
+    firstName: '',
+    lastName: '',
+    contactNumber: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { signOut } = useAuth();
@@ -69,6 +76,19 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
     }
   }, [paymentStep]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setPaymentStep('form');
+      setIsProcessing(false);
+      setErrors({});
+      setPersonalInfo({
+        firstName: userDetails?.firstName ?? '',
+        lastName: userDetails?.lastName ?? '',
+        contactNumber: userDetails?.contactNumber ?? ''
+      });
+    }
+  }, [isOpen, userDetails]);
+
   if (!isOpen) return null;
 
   const fillDummyData = () => {
@@ -80,6 +100,30 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
       cvv: '123'
     });
     setErrors({});
+  };
+
+  const handlePersonalInfoChange = (
+    field: 'firstName' | 'lastName' | 'contactNumber',
+    value: string
+  ) => {
+    setPersonalInfo(prev => ({ ...prev, [field]: value }));
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  const prefillPersonalInfo = () => {
+    if (!userDetails) return;
+
+    setPersonalInfo({
+      firstName: userDetails.firstName || '',
+      lastName: userDetails.lastName || '',
+      contactNumber: userDetails.contactNumber || ''
+    });
+    setErrors(prev => ({
+      ...prev,
+      firstName: '',
+      lastName: '',
+      contactNumber: ''
+    }));
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -111,6 +155,18 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
+
+    if (!personalInfo.firstName.trim()) {
+      newErrors.firstName = 'Please enter your first name';
+    }
+
+    if (!personalInfo.lastName.trim()) {
+      newErrors.lastName = 'Please enter your last name';
+    }
+
+    if (!personalInfo.contactNumber.trim()) {
+      newErrors.contactNumber = 'Please enter your contact number';
+    }
 
     if (!formData.cardNumber || formData.cardNumber.replace(/\s/g, '').length !== 16) {
       newErrors.cardNumber = 'Please enter a valid 16-digit card number';
@@ -148,11 +204,14 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
       
       if (result.success) {
         setPaymentStep('success');
-        // Sign out and redirect to login after 5 seconds to allow user to read the message
-        setTimeout(async () => {
+        onSuccess();
+        try {
           await signOut();
+        } catch (err) {
+          console.error('Error signing out after upgrade:', err);
+        } finally {
           router.push('/login?upgraded=true');
-        }, 5000);
+        }
       } else {
         throw new Error(result.message || 'Payment failed');
       }
@@ -187,6 +246,74 @@ export function PaymentModal({ isOpen, onClose, cognitoUserId, onSuccess }: Paym
           <div className="p-6">
             {paymentStep === 'form' && (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Personal Details */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-grey-600">Tell us about you</p>
+                    <button
+                      type="button"
+                      onClick={prefillPersonalInfo}
+                      disabled={!userDetails}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-full text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <UserIcon className="w-4 h-4" />
+                      Use profile details
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        type="text"
+                        placeholder="Jane"
+                        value={personalInfo.firstName}
+                        onChange={(e) => handlePersonalInfoChange('firstName', e.target.value)}
+                        className={errors.firstName ? 'border-red-500' : ''}
+                        autoComplete="given-name"
+                      />
+                      {errors.firstName && (
+                        <p className="text-sm text-red-500 mt-1">{errors.firstName}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder="Doe"
+                        value={personalInfo.lastName}
+                        onChange={(e) => handlePersonalInfoChange('lastName', e.target.value)}
+                        className={errors.lastName ? 'border-red-500' : ''}
+                        autoComplete="family-name"
+                      />
+                      {errors.lastName && (
+                        <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="contactNumber">Contact Number</Label>
+                    <Input
+                      id="contactNumber"
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={personalInfo.contactNumber}
+                      onChange={(e) =>
+                        handlePersonalInfoChange(
+                          'contactNumber',
+                          e.target.value.replace(/[^0-9+()\s-]/g, '')
+                        )
+                      }
+                      className={errors.contactNumber ? 'border-red-500' : ''}
+                      autoComplete="tel"
+                    />
+                    {errors.contactNumber && (
+                      <p className="text-sm text-red-500 mt-1">{errors.contactNumber}</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Fill Dummy Data Badge */}
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-grey-600">Enter your card details below</p>

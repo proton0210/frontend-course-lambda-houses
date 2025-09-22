@@ -259,19 +259,7 @@ export default function HomePage() {
             </div>
           </div>
           
-          <div className="border-t border-grey-800 pt-8 text-center text-sm text-grey-400">
-            <p>
-              Made for 2025 AWS Lambda Hackathon with ❤️ by{' '}
-              <a 
-                href="https://www.linkedin.com/in/vidit-shah/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-pink-400 hover:text-pink-300 transition-colors"
-              >
-                Vidit
-              </a>
-            </p>
-          </div>
+          <div className="border-t border-grey-800 pt-8 text-center text-sm text-grey-400" />
         </div>
       </footer>
     </div>

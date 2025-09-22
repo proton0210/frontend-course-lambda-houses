@@ -25,6 +25,7 @@ export const updateProperty = /* GraphQL */ `
       propertyType
       listingType
       images
+      imageUrls
       submittedBy
       submittedAt
       updatedAt
@@ -96,8 +97,31 @@ export const approveProperty = /* GraphQL */ `
     approveProperty(id: $id) {
       id
       title
-      status
+      description
+      price
+      address
+      city
+      state
+      zipCode
+      bedrooms
+      bathrooms
+      squareFeet
+      propertyType
+      listingType
+      images
+      imageUrls
+      submittedBy
+      submittedAt
       updatedAt
+      status
+      contactName
+      contactEmail
+      contactPhone
+      amenities
+      yearBuilt
+      lotSize
+      parkingSpaces
+      isPublic
     }
   }
 `;
@@ -107,8 +131,31 @@ export const rejectProperty = /* GraphQL */ `
     rejectProperty(id: $id, reason: $reason) {
       id
       title
-      status
+      description
+      price
+      address
+      city
+      state
+      zipCode
+      bedrooms
+      bathrooms
+      squareFeet
+      propertyType
+      listingType
+      images
+      imageUrls
+      submittedBy
+      submittedAt
       updatedAt
+      status
+      contactName
+      contactEmail
+      contactPhone
+      amenities
+      yearBuilt
+      lotSize
+      parkingSpaces
+      isPublic
     }
   }
 `;

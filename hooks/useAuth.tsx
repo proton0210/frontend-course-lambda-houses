@@ -12,13 +12,11 @@ import {
   forgotPassword,
   confirmForgotPassword,
   getAuthUser,
-  isAuthenticated,
   getUserGroups,
-  isAdmin,
-  isPaidUser,
   type AuthUser,
 } from '@/lib/auth';
 import { useUserStore } from '@/store/user-store';
+import { USER_GROUPS } from '@/lib/amplify-config';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -222,8 +220,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     forgotPassword: authForgotPassword,
     confirmForgotPassword: authConfirmForgotPassword,
     refreshUser,
-    isAdmin: userGroups.includes('admin'),
-    isPaidUser: userGroups.includes('paid'),
+    isAdmin: userGroups.includes(USER_GROUPS.ADMIN),
+    isPaidUser: userGroups.includes(USER_GROUPS.PAID),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

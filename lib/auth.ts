@@ -20,6 +20,9 @@ export interface AuthUser {
   userId: string;
   email?: string;
   groups?: string[];
+  firstName?: string;
+  lastName?: string;
+  contactNumber?: string;
 }
 
 export async function signUp(email: string, password: string, customAttributes?: {
@@ -117,12 +120,18 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const attributes = await fetchUserAttributes();
     
     const groups = session.tokens?.idToken?.payload['cognito:groups'] as string[] | undefined;
+    const firstName = attributes['custom:firstName'];
+    const lastName = attributes['custom:lastName'];
+    const contactNumber = attributes['custom:contactNumber'];
     
     return {
       username: user.username,
       userId: user.userId,
       email: attributes.email,
       groups: groups || [],
+      firstName,
+      lastName,
+      contactNumber,
     };
   } catch (error) {
     console.error('Error getting current user:', error);

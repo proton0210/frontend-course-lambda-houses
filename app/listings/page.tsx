@@ -28,27 +28,58 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, type MouseEvent } from 'react';
 import { api } from '@/lib/api/graphql-client';
 import { PaymentModal } from '@/components/payment/payment-modal';
 import { AIProcessingModal } from '@/components/property/ai-processing-modal';
 import { useSearchParams } from 'next/navigation';
 
 function ListingsContent() {
-  const { user, signOut } = useAuth();
-  const { userSub, email, clearUser } = useUserStore();
-  const { data: userDetails, isLoading: userLoading, refetch: refetchUserDetails } = useUserDetails();
+  const { user, signOut, isPaidUser, isAdmin } = useAuth();
+  const { userSub, clearUser } = useUserStore();
+  const { data: userDetails, isLoading: userLoading } = useUserDetails();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentImageIndex, setCurrentImageIndex] = useState<{[key: string]: number}>({});
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
   const [selectedPropertyForAI, setSelectedPropertyForAI] = useState<any>(null);
   const [showAIProcessing, setShowAIProcessing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{ show: boolean; executionArn?: string; message?: string }>({ show: false });
   const [fetchedProperties, setFetchedProperties] = useState<any[]>([]);
   const [isLoadingProperties, setIsLoadingProperties] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const normalizedTier = userDetails?.tier?.toLowerCase();
+  const isProUser = Boolean(
+    isPaidUser ||
+      isAdmin ||
+      normalizedTier === 'paid' ||
+      normalizedTier === 'admin'
+  );
+
+  const deriveGreetingName = () => {
+    const firstNameSource = userDetails?.firstName?.trim() || user?.firstName?.trim();
+    if (firstNameSource) {
+      return firstNameSource;
+    }
+
+    const emailSource = (userDetails?.email ?? user?.email ?? '').trim();
+    if (emailSource) {
+      const localPart = emailSource.split('@')[0];
+      if (localPart) {
+        return localPart.charAt(0).toUpperCase() + localPart.slice(1);
+      }
+    }
+
+    const username = user?.username?.trim();
+    if (username) {
+      return username;
+    }
+
+    return 'there';
+  };
+
+  const greetingName = deriveGreetingName();
+  const greetingNameFormatted = greetingName.charAt(0).toUpperCase() + greetingName.slice(1);
 
   // Helper function to format enum values for display
   const formatListingType = (type: string): string => {
@@ -295,6 +326,22 @@ function ListingsContent() {
     window.location.reload();
   };
 
+  const handleGenerateInsightsClick = (
+    property: any,
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!isProUser) {
+      setShowPaymentModal(true);
+      return;
+    }
+
+    setSelectedPropertyForAI(property);
+    setShowAIProcessing(true);
+  };
+
   // Fetch properties from the API
   const fetchProperties = async () => {
     try {
@@ -359,15 +406,27 @@ function ListingsContent() {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
                   Property Listings
                 </h1>
-                {userDetails && (
+                {(userDetails || user) && (
                   <div className="flex items-center gap-4">
-                    <div className="text-grey-700">
+                    <div className="text-grey-700 flex items-center gap-2">
                       <span className="text-sm">Welcome back,</span>
-                      <span className="text-sm font-semibold ml-1">
-                        {userDetails.firstName} {userDetails.lastName}!
+                      <span className="text-sm font-semibold">
+                        {greetingNameFormatted}!
                       </span>
+                      {isProUser && !isAdmin && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                          <Crown className="w-3 h-3" />
+                          Pro
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                          <Crown className="w-3 h-3" />
+                          Admin
+                        </span>
+                      )}
                     </div>
-                    {userDetails.tier === 'user' && (
+                    {!isProUser && (
                       <Button
                         onClick={handleUpgrade}
                         className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
@@ -381,8 +440,8 @@ function ListingsContent() {
                 )}
               </div>
               <div className="flex items-center gap-4">
-                {userDetails?.tier !== 'admin' && (
-                  userDetails?.tier === 'paid' ? (
+                {!isAdmin && (
+                  isProUser ? (
                     <Link href="/reports">
                       <Button 
                         variant="outline" 
@@ -412,7 +471,7 @@ function ListingsContent() {
                     </div>
                   )
                 )}
-                {userDetails?.tier === 'admin' ? (
+                {isAdmin ? (
                   <Link href="/admin">
                     <Button className="bg-gradient-to-r from-pink-600 to-purple-600 text-white transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5">
                       To Admin Page
@@ -490,12 +549,12 @@ function ListingsContent() {
                         <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                           {userDetails.firstName.charAt(0)}{userDetails.lastName.charAt(0)}
                         </div>
-                        {userDetails.tier === 'paid' && (
+                        {isProUser && !isAdmin && (
                           <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full p-1.5 shadow-md">
                             <Crown className="w-4 h-4 text-white" />
                           </div>
                         )}
-                        {userDetails.tier === 'admin' && (
+                        {isAdmin && (
                           <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 rounded-full p-1.5 shadow-md">
                             <Crown className="w-4 h-4 text-white" />
                           </div>
@@ -506,12 +565,12 @@ function ListingsContent() {
                           <CardTitle className="text-2xl font-bold text-grey-900">
                             {userDetails.firstName} {userDetails.lastName}
                           </CardTitle>
-                          {userDetails.tier === 'paid' && (
+                          {isProUser && !isAdmin && (
                             <span className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                               PRO MEMBER
                             </span>
                           )}
-                          {userDetails.tier === 'admin' && (
+                          {isAdmin && (
                             <span className="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                               ADMIN
                             </span>
@@ -551,9 +610,23 @@ function ListingsContent() {
             </Card>
           ) : (
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-grey-900 mb-2">
-                Welcome back!
-              </h2>
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-3xl font-bold text-grey-900">
+                  Welcome back, {greetingNameFormatted}!
+                </h2>
+                {isProUser && !isAdmin && (
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    <Crown className="w-4 h-4" />
+                    PRO MEMBER
+                  </span>
+                )}
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    <Crown className="w-4 h-4" />
+                    ADMIN
+                  </span>
+                )}
+              </div>
               <p className="text-grey-600">
                 Browse through available properties or list your own.
               </p>
@@ -662,54 +735,24 @@ function ListingsContent() {
                     
                     {/* AI Insights / Upgrade Section */}
                     <div className="pt-3 mt-3 border-t border-grey-100">
-                      {userDetails?.tier === 'user' ? (
-                        <div 
-                          className="relative"
-                          onMouseEnter={() => setHoveredPropertyId(property.id)}
-                          onMouseLeave={() => setHoveredPropertyId(null)}
-                        >
-                          <button className="w-full flex items-center justify-center gap-2 py-2 text-amber-600 hover:text-amber-700 transition-colors">
-                            <Crown className="w-5 h-5" />
-                            <span className="text-sm font-medium">AI Insights</span>
-                          </button>
-                          
-                          {/* Hover Modal */}
-                          {hoveredPropertyId === property.id && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-4 bg-grey-900 text-white rounded-lg shadow-xl z-10 w-64">
-                              <div className="text-center space-y-2">
-                                <Sparkles className="w-8 h-8 text-amber-400 mx-auto" />
-                                <h4 className="font-semibold">Unlock AI Property Insights</h4>
-                                <p className="text-sm text-grey-300">
-                                  Get detailed AI-powered analysis, price predictions, and investment recommendations.
-                                </p>
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowPaymentModal(true);
-                                  }}
-                                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 w-full"
-                                >
-                                  Upgrade to Pro
-                                </Button>
-                              </div>
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-grey-900"></div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPropertyForAI(property);
-                            setShowAIProcessing(true);
-                          }}
-                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                        >
-                          <Brain className="w-4 h-4 mr-2" />
-                          Generate AI Insights
-                        </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        aria-disabled={!isProUser}
+                        onClick={(event) => handleGenerateInsightsClick(property, event)}
+                        className={`w-full flex items-center justify-center gap-2 py-2 transition-colors ${
+                          isProUser
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                            : 'bg-grey-100 text-grey-500 hover:bg-grey-200 hover:text-grey-600 border border-grey-200'
+                        }`}
+                      >
+                        <Brain className="w-4 h-4 mr-2" />
+                        <span className="text-sm font-medium">Generate AI Insights</span>
+                      </Button>
+                      {!isProUser && (
+                        <p className="mt-2 text-xs text-grey-500 text-center">
+                          Upgrade to Pro to unlock AI-powered insights.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -741,6 +784,7 @@ function ListingsContent() {
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           cognitoUserId={userSub}
+          userDetails={userDetails ?? null}
           onSuccess={handlePaymentSuccess}
         />
       )}
